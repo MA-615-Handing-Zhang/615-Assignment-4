@@ -5,11 +5,17 @@ date: "11/29/2021"
 output: pdf_document
 ---
 
+## Task 1:
+
+I picked ***The Sea-Wolf*** by Jack London
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.align = "center")
 ```
 
-Packages
+
+
+## Task 2
 ```{r packages, include=FALSE}
 pacman::p_load(gutenbergr, dplyr, tidytext, janeaustenr, stringr, 
                scales, ggplot2, tidyr, textdata, wordcloud, reshape2, tidyverse)
@@ -19,6 +25,7 @@ pacman::p_load(gutenbergr, dplyr, tidytext, janeaustenr, stringr,
 Download the Book **Sea-Wolf** from gutenberg package.
 ```{r}
 sea <- gutenberg_download(1074)
+view(sea)
 ```
 
 Turn the dataset to a tidy form.
@@ -50,7 +57,7 @@ tidy_sea %>%
   filter(n >= 100) %>% 
   ggplot(aes(x = n, y = reorder(word, n))) +
   geom_col() + 
-  labs(y = NULL)
+  labs(y = NULL) 
 ```
 
 Let's calculate the frequency of each word
@@ -213,7 +220,6 @@ tidy_sea %>%
 
 Word cloud with positive sentiments blow and neggative above.
 ```{r}
-
 tidy_sea %>%
   inner_join(bing) %>%
   count(word, sentiment, sort = TRUE) %>%
@@ -221,6 +227,52 @@ tidy_sea %>%
   comparison.cloud(colors = c("gray20", "gray80"),
                    max.words = 100)
 ```
+
+
+
+
+## Task 3
+
+
+
+```{r}
+# devtools::install_github("Truenumbers/tnum/tnum")
+# library(Truenumbers) this one did not work
+library(tnum)
+
+```
+
+
+
+
+
+
+```{r}
+## first create my own branch for the text into the mssp server
+source('Book2TN-v6A-1.R')
+tnum.authorize('mssp1.bu.edu') # get the access of the server
+tnum.setSpace("test3") # use the test3 space of the server
+game_txt <- readLines("game.txt") #game 1160
+# tnBooksFromLines(game_txt, 'handing/game2')  # use the Book2Tn to digest (started 10:27)
+# tnum.getDBPathList(taxonomy = 'subject', level = 1) # check the branch in server
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
