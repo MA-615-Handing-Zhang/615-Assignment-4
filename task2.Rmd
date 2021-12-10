@@ -1,0 +1,230 @@
+---
+title: "Task1&2"
+author: "Handing Zhang"
+date: "11/29/2021"
+output: pdf_document
+---
+
+## Task 1:
+
+I picked ***The Game*** by Jack London
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.align = "center")
+```
+
+
+## Task 2
+```{r packages, include=FALSE}
+pacman::p_load(gutenbergr, dplyr, tidytext, janeaustenr, stringr, 
+               scales, ggplot2, tidyr, textdata, wordcloud, reshape2, tidyverse)
+```
+
+## Download Data and Explore
+Download the Book **game** from gutenberg package.
+```{r}
+game <- gutenberg_download(1160)
+# view(game)
+```
+
+Turn the dataset to a tidy form.
+```{r}
+tidy_game <- game %>%
+  unnest_tokens(word, text) %>%  # output is word column, input is from text column in original game dataset.
+  anti_join(stop_words) # get rid of stop words
+
+tidy_game <- game %>% 
+  mutate(
+    linenumber = row_number(),
+    chapter = cumsum(str_detect(text,       # add a chapter column to mark chapter number.
+                                regex("^chapter [\\divxlc]", 
+                                      ignore_case = TRUE))))%>%
+   unnest_tokens(word, text) %>% 
+   anti_join(stop_words) # get rid of stop words.
+```
+
+We start by looking at the most frequently appeared words in the book.
+```{r}
+tidy_game %>% 
+  count(word, sort = T)
+```
+
+let's also visualize the words that appeared more than 30 times in a descending order.
+```{r plot1}
+tidy_game %>% 
+  count(word, sort = T) %>% 
+  filter(n >= 30) %>% 
+  ggplot(aes(x = n, y = reorder(word, n))) +
+  geom_col() + 
+  labs(y = NULL) 
+```
+
+Let's calculate the frequency of each word
+```{r frequency of words}
+frequency <- tidy_game %>% 
+  mutate(word = str_extract(word, "[a-z']+")) %>%  
+  ## eliminate underscores around words so that _apple_ is treated thesame as apple.
+  count(word) %>% 
+  mutate(proportion = n / sum(n)) %>% 
+  arrange(desc(proportion))
+
+frequency
+```
+
+## Sentimental Analysis
+
+Get sentiment words from sentiment lexicons "AFINN" "BING" "NRC"
+```{r}
+afinn <- get_sentiments("afinn")
+bing <- get_sentiments("bing")
+```
+
+
+```{r}
+# textdata::lexicon_nrc(delete = TRUE)
+# nrc <- textdata::lexicon_nrc()
+# write.csv(nrc, "/Users/handingzhang/Desktop/mssp/MA 615/Homework/615-Assignment-4/nrc.csv", row.names = FALSE)
+nrc <- read.csv("nrc.csv")
+```
+
+
+Now let's see the most frequently used word with "joy" sentiment according to nrc in **The game**
+```{r}
+nrc_joy <- nrc %>% 
+  filter(sentiment == "joy")
+# nrc_joy
+# we take out all words with joy sentiment from nrc.
+
+
+# use inner_join to join the rows of tidy_game that has the according elements
+tidy_game %>%
+  inner_join(nrc_joy) %>%
+  count(word, sort = TRUE)
+
+```
+
+
+
+We get a sentiment score for each 80 lines by the number of positive and negative sentimental words according to nrc.
+```{r}
+
+game_sentiment <- tidy_game %>%
+  inner_join(bing) %>%
+  count(index = linenumber %/% 80, sentiment) %>%  
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+
+```
+
+
+
+Plot the sentiment score by nrc measure against timeline of the book by index of 80 lines.
+```{r plot2}
+ggplot(game_sentiment, aes(index, sentiment)) +
+  geom_col(show.legend = FALSE, color = "blue")
+
+```
+
+We see in general the sentiment is quite negative, but we also notice that at one point the sentinent is fairly high.
+```{r}
+which(game_sentiment$sentiment >= 10)
+```
+There might be a positive plot happening between line 102 * 80 = 8160 and 103 * 80 = 8240.
+
+
+
+Now let's compare the three lexicons.
+```{r}
+
+# Measured by afinn
+game_afinn <- tidy_game %>% 
+  inner_join(afinn) %>% 
+  group_by(index = linenumber %/% 80) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "AFINN")
+
+# Measured by bing and nrc
+game_bing_and_nrc <- bind_rows(
+  tidy_game %>% 
+    inner_join(bing) %>%
+    mutate(method = "Bing"),
+  tidy_game %>% 
+    inner_join(nrc %>% 
+                 filter(sentiment %in% c("positive", 
+                                         "negative"))) %>%
+    mutate(method = "NRC")) %>%
+  count(method, index = linenumber %/% 80, sentiment) %>%
+  pivot_wider(names_from = sentiment,
+              values_from = n,
+              values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+
+```
+
+
+
+Compare the visualization of sentiment measurements by the three methods
+```{r plot3}
+bind_rows(game_afinn, 
+          game_bing_and_nrc) %>%
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~method, ncol = 1, scales = "free_y")
+```
+
+
+
+
+
+Count the number of each word in each sentiment for being.
+```{r}
+game_bing_word_counts <- tidy_game %>%
+  inner_join(bing) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+
+game_bing_word_counts
+```
+
+
+
+
+```{r plot4}
+game_bing_word_counts %>%
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = "Contribution to sentiment",
+       y = NULL)
+
+```
+
+
+
+
+Make a word cloud
+```{r plot5}
+tidy_game %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 100))
+```
+
+
+Word cloud with positive sentiments blow and neggative above.
+```{r}
+tidy_game %>%
+  inner_join(bing) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("gray20", "gray80"),
+                   max.words = 100)
+```
+
+
